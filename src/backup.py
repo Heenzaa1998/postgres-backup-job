@@ -62,37 +62,46 @@ def main():
     """Main entry point."""
     logger.info("Starting backup script...")
     
-    # Load configuration
-    config = get_config()
-    logger.info(f"Backup directory: {config['backup_dir']}")
-    
-    # Test database connection
-    if not test_connection(config):
-        logger.error("Database connection failed. Exiting.")
+    try:
+        # Load configuration
+        config = get_config()
+        logger.info(f"Backup directory: {config['backup_dir']}")
+        
+        # Test database connection
+        if not test_connection(config):
+            logger.error("Database connection failed. Exiting.")
+            sys.exit(1)
+        
+        logger.info("Database connection successful!")
+        
+        # Ensure backup directory exists
+        ensure_backup_dir(config['backup_dir'])
+        
+        # Generate backup filename
+        backup_file = generate_backup_filename(config['backup_dir'])
+        
+        # Run pg_dump
+        run_pg_dump(config, backup_file)
+        
+        # Compress backup
+        final_file = compress_backup(backup_file)
+        
+        # Show final file info
+        file_size = os.path.getsize(final_file)
+        logger.info(f"Backup completed: {final_file} ({file_size / 1024:.1f} KB)")
+        
+    except Exception as e:
+        logger.error(f"Backup failed: {e}")
         sys.exit(1)
-    
-    logger.info("Database connection successful!")
-    
-    # Ensure backup directory exists
-    ensure_backup_dir(config['backup_dir'])
-    
-    # Generate backup filename
-    backup_file = generate_backup_filename(config['backup_dir'])
-    
-    # Run pg_dump
-    run_pg_dump(config, backup_file)
-    
-    # Compress backup
-    final_file = compress_backup(backup_file)
-    
-    # Show final file info
-    file_size = os.path.getsize(final_file)
-    logger.info(f"Backup completed: {final_file} ({file_size / 1024:.1f} KB)")
 
 
 def ensure_backup_dir(backup_dir):
     """Create backup directory if it doesn't exist."""
-    os.makedirs(backup_dir, exist_ok=True)
+    try:
+        os.makedirs(backup_dir, exist_ok=True)
+    except OSError as e:
+        logger.error(f"Failed to create backup directory: {e}")
+        raise
 
 
 def generate_backup_filename(backup_dir):
@@ -116,23 +125,34 @@ def run_pg_dump(config, output_file):
         '-f', output_file
     ]
     
-    logger.info("Running pg_dump...")
-    subprocess.run(cmd, env=env, check=True)
-    logger.info(f"Backup created: {output_file}")
+    try:
+        logger.info("Running pg_dump...")
+        subprocess.run(cmd, env=env, check=True, capture_output=True, text=True)
+        logger.info(f"Backup created: {output_file}")
+    except subprocess.CalledProcessError as e:
+        logger.error(f"pg_dump failed: {e.stderr}")
+        raise
+    except FileNotFoundError:
+        logger.error("pg_dump not found. Please install PostgreSQL client tools.")
+        raise
 
 
 def compress_backup(backup_file):
     """Compress backup file with gzip."""
     compressed_file = backup_file + '.gz'
-    logger.info("Compressing backup with gzip...")
     
-    with open(backup_file, 'rb') as f_in:
-        with gzip.open(compressed_file, 'wb') as f_out:
-            shutil.copyfileobj(f_in, f_out)
-    
-    # Remove original .sql file
-    os.remove(backup_file)
-    return compressed_file
+    try:
+        logger.info("Compressing backup with gzip...")
+        with open(backup_file, 'rb') as f_in:
+            with gzip.open(compressed_file, 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
+        
+        # Remove original .sql file
+        os.remove(backup_file)
+        return compressed_file
+    except OSError as e:
+        logger.error(f"Failed to compress backup: {e}")
+        raise
 
 
 if __name__ == '__main__':
