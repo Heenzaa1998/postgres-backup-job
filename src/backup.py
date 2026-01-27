@@ -7,6 +7,7 @@ This script connects to a PostgreSQL database and performs automated backups.
 import os
 import sys
 import logging
+import subprocess
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -69,6 +70,48 @@ def main():
         sys.exit(1)
     
     logger.info("Database connection successful!")
+    
+    # Ensure backup directory exists
+    ensure_backup_dir(config['backup_dir'])
+    
+    # Generate backup filename
+    backup_file = generate_backup_filename(config['backup_dir'])
+    
+    # Run pg_dump
+    run_pg_dump(config, backup_file)
+    
+    logger.info("Backup completed!")
+
+
+def ensure_backup_dir(backup_dir):
+    """Create backup directory if it doesn't exist."""
+    os.makedirs(backup_dir, exist_ok=True)
+
+
+def generate_backup_filename(backup_dir):
+    """Generate backup filename with timestamp."""
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    filename = f"backup_{timestamp}.sql"
+    return os.path.join(backup_dir, filename)
+
+
+def run_pg_dump(config, output_file):
+    """Run pg_dump to create backup file."""
+    env = os.environ.copy()
+    env['PGPASSWORD'] = config['password']
+    
+    cmd = [
+        'pg_dump',
+        '-h', config['host'],
+        '-p', config['port'],
+        '-U', config['user'],
+        '-d', config['database'],
+        '-f', output_file
+    ]
+    
+    logger.info("Running pg_dump...")
+    subprocess.run(cmd, env=env, check=True)
+    logger.info(f"Backup created: {output_file}")
 
 
 if __name__ == '__main__':
