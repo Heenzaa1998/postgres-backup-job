@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres-backup-test
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-backup_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-backup_password}
+      POSTGRES_DB: ${POSTGRES_DB:-testdb}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-backup_user} -d ${POSTGRES_DB:-testdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
