@@ -7,6 +7,7 @@ This script connects to a PostgreSQL database and performs automated backups.
 import os
 import sys
 import gzip
+import time
 import shutil
 import logging
 import subprocess
@@ -36,6 +37,8 @@ def get_config():
         'password': os.environ.get('POSTGRES_PASSWORD', 'backup_password'),
         'database': os.environ.get('POSTGRES_DB', 'testdb'),
         'backup_dir': os.environ.get('BACKUP_DIR', './backups'),
+        'retry_count': int(os.environ.get('RETRY_COUNT', '3')),
+        'retry_delay': int(os.environ.get('RETRY_DELAY', '5')),
     }
     return config
 
@@ -54,8 +57,24 @@ def test_connection(config):
         logger.info(f"Connected to {config['database']}@{config['host']}:{config['port']}")
         return True
     except psycopg2.Error as e:
-        logger.error(f"Failed to connect to database: {e}")
+        logger.warning(f"Connection attempt failed: {e}")
         return False
+
+
+def connect_with_retry(config):
+    """Try to connect to database with retry logic."""
+    retry_count = config['retry_count']
+    retry_delay = config['retry_delay']
+    
+    for attempt in range(1, retry_count + 1):
+        if test_connection(config):
+            return True
+        
+        if attempt < retry_count:
+            logger.warning(f"Retrying in {retry_delay} seconds... ({attempt}/{retry_count})")
+            time.sleep(retry_delay)
+    
+    return False
 
 
 def main():
@@ -67,9 +86,9 @@ def main():
         config = get_config()
         logger.info(f"Backup directory: {config['backup_dir']}")
         
-        # Test database connection
-        if not test_connection(config):
-            logger.error("Database connection failed. Exiting.")
+        # Test database connection with retry
+        if not connect_with_retry(config):
+            logger.error("Database connection failed after all retries. Exiting.")
             sys.exit(1)
         
         logger.info("Database connection successful!")
