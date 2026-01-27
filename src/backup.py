@@ -6,6 +6,8 @@ This script connects to a PostgreSQL database and performs automated backups.
 
 import os
 import sys
+import gzip
+import shutil
 import logging
 import subprocess
 from datetime import datetime
@@ -80,7 +82,12 @@ def main():
     # Run pg_dump
     run_pg_dump(config, backup_file)
     
-    logger.info("Backup completed!")
+    # Compress backup
+    final_file = compress_backup(backup_file)
+    
+    # Show final file info
+    file_size = os.path.getsize(final_file)
+    logger.info(f"Backup completed: {final_file} ({file_size / 1024:.1f} KB)")
 
 
 def ensure_backup_dir(backup_dir):
@@ -112,6 +119,20 @@ def run_pg_dump(config, output_file):
     logger.info("Running pg_dump...")
     subprocess.run(cmd, env=env, check=True)
     logger.info(f"Backup created: {output_file}")
+
+
+def compress_backup(backup_file):
+    """Compress backup file with gzip."""
+    compressed_file = backup_file + '.gz'
+    logger.info("Compressing backup with gzip...")
+    
+    with open(backup_file, 'rb') as f_in:
+        with gzip.open(compressed_file, 'wb') as f_out:
+            shutil.copyfileobj(f_in, f_out)
+    
+    # Remove original .sql file
+    os.remove(backup_file)
+    return compressed_file
 
 
 if __name__ == '__main__':
