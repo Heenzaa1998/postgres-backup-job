@@ -205,3 +205,21 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# ===================
+# Project-specific
+# ===================
+
+# Backup files (never commit actual backups!)
+backups/
+*.sql.gz
+*.dump
+*.dump.gz
+*.backup
+
+# Docker
+docker-data/
+
+# IDE
+.idea/
+.vscode/
