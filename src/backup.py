@@ -136,14 +136,14 @@ def main():
         if target in ['local', 'all']:
             cleanup_old_backups(config['backup_dir'], config['retention_days'])
         
+        # Verify backup if enabled (before deleting local file)
+        if config['verify_enabled']:
+            verify_backup(final_file, config)
+        
         # Delete local file if remote-only mode
         if target == 'remote':
             os.remove(final_file)
             logger.info(f"Removed local file (remote-only mode): {final_file}")
-        
-        # Verify backup if enabled
-        if config['verify_enabled']:
-            verify_backup(final_file, config)
         
     except Exception as e:
         logger.error(f"Backup failed: {e}")
