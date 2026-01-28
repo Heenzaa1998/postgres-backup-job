@@ -6,6 +6,7 @@ Python automation for PostgreSQL backups with gzip compression.
 
 - **pg_dump backup** — Full database dump
 - **gzip compression** — Reduce backup size by 70-90%
+- **Storage strategy** — Local, remote (S3-compatible), or both
 - **Retention policy** — Auto-delete backups older than N days
 - **Backup verification** — Test restore to validate backup integrity
 - **Connection retry** — Automatic retry on connection failure
@@ -46,8 +47,49 @@ python src/backup.py
 | `VERIFY_USER` | POSTGRES_USER | Verify database user |
 | `VERIFY_PASSWORD` | POSTGRES_PASSWORD | Verify database password |
 | `VERIFY_DB` | testdb_verify | Temp database for verification |
+| `BACKUP_TARGET` | local | Storage target: local, remote, or all |
+| `REMOTE_ENDPOINT` | http://localhost:9000 | S3-compatible endpoint |
+| `REMOTE_BUCKET` | test-backup | Bucket name |
+| `REMOTE_ACCESS_KEY` | minioadmin | Access key |
+| `REMOTE_SECRET_KEY` | minioadmin | Secret key |
+| `REMOTE_REGION` | us-east-1 | Region |
+| `REMOTE_PATH_FORMAT` | monthly | Path format: flat, monthly, or daily |
 
 > **Production Recommendation:** For production environments, use a **separate PostgreSQL instance** for verification to avoid impacting production performance and to validate backup portability.
+
+<details>
+<summary>Example: Separate Verify Instance</summary>
+
+Add to `docker-compose.yml`:
+
+```yaml
+postgres-verify:
+  image: postgres:16-alpine
+  environment:
+    POSTGRES_USER: backup_user
+    POSTGRES_PASSWORD: backup_password
+    POSTGRES_DB: testdb_verify
+  ports:
+    - "5433:5432"
+```
+
+Then set in `.env`:
+```bash
+VERIFY_HOST=localhost
+VERIFY_PORT=5433
+```
+
+</details>
+
+> **Remote Retention:** Use S3/MinIO lifecycle policies to automatically delete old backups from remote storage.
+
+### Remote Path Formats
+
+| Format | Example Path |
+|--------|--------------|
+| `flat` | `backup_2026-01-28.sql.gz` |
+| `monthly` | `2026-01/backup_2026-01-28.sql.gz` |
+| `daily` | `2026-01-28/backup_2026-01-28.sql.gz` |
 
 ## Output
 
@@ -91,9 +133,24 @@ python src/backup.py
 ## Development Setup
 
 ```bash
-# Start PostgreSQL with sample data
+# Start all services (PostgreSQL + MinIO)
 docker compose up -d
 
-# Verify database
-docker compose exec postgres psql -U backup_user -d testdb -c "SELECT * FROM users;"
+# Start only PostgreSQL
+docker compose up -d postgres
+
+# Start only MinIO
+docker compose up -d minio
 ```
+
+### Verify Services
+
+```bash
+# Check PostgreSQL
+docker compose exec postgres psql -U backup_user -d testdb -c "SELECT * FROM users;"
+
+# Check MinIO Console
+# Open: http://localhost:9001
+# Login: minioadmin / minioadmin
+```
+
