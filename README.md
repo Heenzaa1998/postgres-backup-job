@@ -6,6 +6,7 @@ Python automation for PostgreSQL backups with gzip compression.
 
 - **pg_dump backup** — Full database dump
 - **gzip compression** — Reduce backup size by 70-90%
+- **Retention policy** — Auto-delete backups older than N days
 - **Connection retry** — Automatic retry on connection failure
 - **Configurable** — All settings via environment variables
 
@@ -37,15 +38,19 @@ python src/backup.py
 | `BACKUP_DIR` | ./backups | Backup output directory |
 | `RETRY_COUNT` | 3 | Connection retry attempts |
 | `RETRY_DELAY` | 5 | Seconds between retries |
+| `RETENTION_DAYS` | 7 | Delete backups older than N days (0=disable) |
 
 ## Output
 
 ```
-2026-01-27 23:15:51 [INFO] Starting backup script...
-2026-01-27 23:15:51 [INFO] Connected to testdb@localhost:5432
-2026-01-27 23:15:51 [INFO] Running pg_dump...
-2026-01-27 23:15:51 [INFO] Compressing backup with gzip...
-2026-01-27 23:15:52 [INFO] Backup completed: ./backups/backup_2026-01-27_23-15-51.sql.gz (1.3 KB)
+2026-01-28 21:40:58 [INFO] Starting backup script...
+2026-01-28 21:40:58 [INFO] Connected to testdb@localhost:5432
+2026-01-28 21:40:58 [INFO] Running pg_dump...
+2026-01-28 21:40:58 [INFO] Compressing backup with gzip...
+2026-01-28 21:40:58 [INFO] Backup completed: ./backups/backup_2026-01-28.sql.gz (1.3 KB)
+2026-01-28 21:40:58 [INFO] Cleaning up backups older than 7 days...
+2026-01-28 21:40:58 [INFO] Deleted old backup: backup_2026-01-20.sql.gz
+2026-01-28 21:40:58 [INFO] Cleanup complete: 1 file(s) removed
 ```
 
 ## Development Setup
