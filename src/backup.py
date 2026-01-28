@@ -56,6 +56,7 @@ def get_config():
         'remote_access_key': os.environ.get('REMOTE_ACCESS_KEY', 'minioadmin'),
         'remote_secret_key': os.environ.get('REMOTE_SECRET_KEY', 'minioadmin'),
         'remote_region': os.environ.get('REMOTE_REGION', 'us-east-1'),
+        'remote_path_format': os.environ.get('REMOTE_PATH_FORMAT', 'monthly'),  # flat | monthly | daily
     }
     return config
 
@@ -399,9 +400,21 @@ def upload_to_remote(backup_file, config):
         )
         
         filename = os.path.basename(backup_file)
-        s3_client.upload_file(backup_file, config['remote_bucket'], filename)
         
-        logger.info(f"Uploaded to remote: {filename}")
+        # Generate path based on format
+        path_format = config['remote_path_format']
+        now = datetime.now()
+        
+        if path_format == 'monthly':
+            remote_path = f"{now.strftime('%Y-%m')}/{filename}"
+        elif path_format == 'daily':
+            remote_path = f"{now.strftime('%Y-%m-%d')}/{filename}"
+        else:  # flat
+            remote_path = filename
+        
+        s3_client.upload_file(backup_file, config['remote_bucket'], remote_path)
+        
+        logger.info(f"Uploaded to remote: {remote_path}")
         
     except Exception as e:
         logger.error(f"Remote upload failed: {e}")
