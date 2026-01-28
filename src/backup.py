@@ -11,7 +11,7 @@ import time
 import shutil
 import logging
 import subprocess
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 import psycopg2
@@ -39,6 +39,7 @@ def get_config():
         'backup_dir': os.environ.get('BACKUP_DIR', './backups'),
         'retry_count': int(os.environ.get('RETRY_COUNT', '3')),
         'retry_delay': int(os.environ.get('RETRY_DELAY', '5')),
+        'retention_days': int(os.environ.get('RETENTION_DAYS', '7')),
     }
     return config
 
@@ -109,6 +110,9 @@ def main():
         file_size = os.path.getsize(final_file)
         logger.info(f"Backup completed: {final_file} ({file_size / 1024:.1f} KB)")
         
+        # Cleanup old backups
+        cleanup_old_backups(config['backup_dir'], config['retention_days'])
+        
     except Exception as e:
         logger.error(f"Backup failed: {e}")
         sys.exit(1)
@@ -172,6 +176,34 @@ def compress_backup(backup_file):
     except OSError as e:
         logger.error(f"Failed to compress backup: {e}")
         raise
+
+
+def cleanup_old_backups(backup_dir, retention_days):
+    """Delete backup files older than retention_days."""
+    if retention_days <= 0:
+        logger.info("Retention disabled (RETENTION_DAYS=0)")
+        return
+    
+    logger.info(f"Cleaning up backups older than {retention_days} days...")
+    cutoff_time = datetime.now() - timedelta(days=retention_days)
+    deleted_count = 0
+    
+    for filename in os.listdir(backup_dir):
+        if not filename.endswith('.sql.gz'):
+            continue
+        
+        filepath = os.path.join(backup_dir, filename)
+        file_mtime = datetime.fromtimestamp(os.path.getmtime(filepath))
+        
+        if file_mtime < cutoff_time:
+            os.remove(filepath)
+            logger.info(f"Deleted old backup: {filename}")
+            deleted_count += 1
+    
+    if deleted_count > 0:
+        logger.info(f"Cleanup complete: {deleted_count} file(s) removed")
+    else:
+        logger.info("No old backups to clean up")
 
 
 if __name__ == '__main__':
