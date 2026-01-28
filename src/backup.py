@@ -40,6 +40,13 @@ def get_config():
         'retry_count': int(os.environ.get('RETRY_COUNT', '3')),
         'retry_delay': int(os.environ.get('RETRY_DELAY', '5')),
         'retention_days': int(os.environ.get('RETENTION_DAYS', '7')),
+        # Verify configuration
+        'verify_enabled': os.environ.get('VERIFY_ENABLED', 'false').lower() == 'true',
+        'verify_host': os.environ.get('VERIFY_HOST', os.environ.get('POSTGRES_HOST', 'localhost')),
+        'verify_port': os.environ.get('VERIFY_PORT', os.environ.get('POSTGRES_PORT', '5432')),
+        'verify_user': os.environ.get('VERIFY_USER', os.environ.get('POSTGRES_USER', 'backup_user')),
+        'verify_password': os.environ.get('VERIFY_PASSWORD', os.environ.get('POSTGRES_PASSWORD', 'backup_password')),
+        'verify_db': os.environ.get('VERIFY_DB', 'testdb_verify'),
     }
     return config
 
@@ -112,6 +119,10 @@ def main():
         
         # Cleanup old backups
         cleanup_old_backups(config['backup_dir'], config['retention_days'])
+        
+        # Verify backup if enabled
+        if config['verify_enabled']:
+            verify_backup(final_file, config)
         
     except Exception as e:
         logger.error(f"Backup failed: {e}")
@@ -209,6 +220,148 @@ def cleanup_old_backups(backup_dir, retention_days):
     except OSError as e:
         logger.error(f"Cleanup failed: {e}")
         # Don't raise - cleanup failure shouldn't fail the backup
+
+
+def verify_backup(backup_file, config):
+    """Verify backup by restoring to a temp database."""
+    logger.info("Verifying backup...")
+    
+    verify_config = {
+        'host': config['verify_host'],
+        'port': config['verify_port'],
+        'user': config['verify_user'],
+        'password': config['verify_password'],
+        'database': config['verify_db'],
+    }
+    
+    try:
+        # Create temp database
+        create_temp_db(verify_config)
+        
+        # Restore backup to temp database
+        restore_backup(backup_file, verify_config)
+        
+        # Verify data exists
+        verify_data(verify_config)
+        
+        logger.info("Backup verified successfully")
+        
+    except Exception as e:
+        logger.error(f"Backup verification failed: {e}")
+        raise
+    finally:
+        # Always drop temp database
+        drop_temp_db(verify_config)
+
+
+def create_temp_db(config):
+    """Create temporary database for verification."""
+    logger.info(f"Creating temp database: {config['database']}")
+    
+    conn = psycopg2.connect(
+        host=config['host'],
+        port=config['port'],
+        user=config['user'],
+        password=config['password'],
+        dbname='postgres'  # Connect to default DB to create new one
+    )
+    conn.autocommit = True
+    
+    cursor = conn.cursor()
+    # Drop if exists (in case of previous failed run)
+    cursor.execute(f"DROP DATABASE IF EXISTS {config['database']}")
+    cursor.execute(f"CREATE DATABASE {config['database']}")
+    cursor.close()
+    conn.close()
+
+
+def restore_backup(backup_file, config):
+    """Restore backup to temp database."""
+    logger.info("Restoring backup to temp database...")
+    
+    env = os.environ.copy()
+    env['PGPASSWORD'] = config['password']
+    
+    # Decompress and restore using gunzip + psql
+    gunzip_cmd = ['gunzip', '-c', backup_file]
+    psql_cmd = [
+        'psql',
+        '-h', config['host'],
+        '-p', config['port'],
+        '-U', config['user'],
+        '-d', config['database'],
+        '-q'  # Quiet mode
+    ]
+    
+    # Pipe gunzip output to psql
+    gunzip_proc = subprocess.Popen(gunzip_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    psql_proc = subprocess.Popen(psql_cmd, stdin=gunzip_proc.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+    gunzip_proc.stdout.close()
+    
+    _, stderr = psql_proc.communicate()
+    if psql_proc.returncode != 0:
+        raise Exception(f"Restore failed: {stderr.decode()}")
+
+
+def verify_data(config):
+    """Verify that data exists in temp database."""
+    conn = psycopg2.connect(
+        host=config['host'],
+        port=config['port'],
+        user=config['user'],
+        password=config['password'],
+        dbname=config['database']
+    )
+    
+    cursor = conn.cursor()
+    # Count tables
+    cursor.execute("""
+        SELECT COUNT(*) FROM information_schema.tables 
+        WHERE table_schema = 'public'
+    """)
+    table_count = cursor.fetchone()[0]
+    
+    # Count total rows across all tables
+    cursor.execute("""
+        SELECT SUM(n_tup_ins) FROM pg_stat_user_tables
+    """)
+    row_count = cursor.fetchone()[0] or 0
+    
+    cursor.close()
+    conn.close()
+    
+    logger.info(f"Verified: {table_count} tables found")
+    
+    if table_count == 0:
+        raise Exception("No tables found in restored database")
+
+
+def drop_temp_db(config):
+    """Drop temporary database."""
+    logger.info(f"Dropping temp database: {config['database']}")
+    
+    try:
+        conn = psycopg2.connect(
+            host=config['host'],
+            port=config['port'],
+            user=config['user'],
+            password=config['password'],
+            dbname='postgres'
+        )
+        conn.autocommit = True
+        
+        cursor = conn.cursor()
+        # Terminate connections to the database
+        cursor.execute(f"""
+            SELECT pg_terminate_backend(pid) 
+            FROM pg_stat_activity 
+            WHERE datname = '{config['database']}'
+        """)
+        cursor.execute(f"DROP DATABASE IF EXISTS {config['database']}")
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        logger.warning(f"Failed to drop temp database: {e}")
 
 
 if __name__ == '__main__':
