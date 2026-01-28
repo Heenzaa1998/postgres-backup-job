@@ -188,22 +188,27 @@ def cleanup_old_backups(backup_dir, retention_days):
     cutoff_time = datetime.now() - timedelta(days=retention_days)
     deleted_count = 0
     
-    for filename in os.listdir(backup_dir):
-        if not filename.endswith('.sql.gz'):
-            continue
+    try:
+        for filename in os.listdir(backup_dir):
+            if not filename.endswith('.sql.gz'):
+                continue
+            
+            filepath = os.path.join(backup_dir, filename)
+            file_mtime = datetime.fromtimestamp(os.path.getmtime(filepath))
+            
+            if file_mtime < cutoff_time:
+                os.remove(filepath)
+                logger.info(f"Deleted old backup: {filename}")
+                deleted_count += 1
         
-        filepath = os.path.join(backup_dir, filename)
-        file_mtime = datetime.fromtimestamp(os.path.getmtime(filepath))
-        
-        if file_mtime < cutoff_time:
-            os.remove(filepath)
-            logger.info(f"Deleted old backup: {filename}")
-            deleted_count += 1
-    
-    if deleted_count > 0:
-        logger.info(f"Cleanup complete: {deleted_count} file(s) removed")
-    else:
-        logger.info("No old backups to clean up")
+        if deleted_count > 0:
+            logger.info(f"Cleanup complete: {deleted_count} file(s) removed")
+        else:
+            logger.info("No old backups to clean up")
+            
+    except OSError as e:
+        logger.error(f"Cleanup failed: {e}")
+        # Don't raise - cleanup failure shouldn't fail the backup
 
 
 if __name__ == '__main__':
