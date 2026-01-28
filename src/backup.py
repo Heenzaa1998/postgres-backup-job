@@ -15,6 +15,8 @@ from datetime import datetime, timedelta
 
 from dotenv import load_dotenv
 import psycopg2
+import boto3
+from botocore.client import Config
 
 # Load environment variables from .env file
 load_dotenv()
@@ -47,6 +49,14 @@ def get_config():
         'verify_user': os.environ.get('VERIFY_USER', os.environ.get('POSTGRES_USER', 'backup_user')),
         'verify_password': os.environ.get('VERIFY_PASSWORD', os.environ.get('POSTGRES_PASSWORD', 'backup_password')),
         'verify_db': os.environ.get('VERIFY_DB', 'testdb_verify'),
+        # Storage configuration
+        'backup_target': os.environ.get('BACKUP_TARGET', 'local'),  # local | remote | all
+        'remote_endpoint': os.environ.get('REMOTE_ENDPOINT', 'http://localhost:9000'),
+        'remote_bucket': os.environ.get('REMOTE_BUCKET', 'test-backup'),
+        'remote_access_key': os.environ.get('REMOTE_ACCESS_KEY', 'minioadmin'),
+        'remote_secret_key': os.environ.get('REMOTE_SECRET_KEY', 'minioadmin'),
+        'remote_region': os.environ.get('REMOTE_REGION', 'us-east-1'),
+        'remote_path_format': os.environ.get('REMOTE_PATH_FORMAT', 'monthly'),  # flat | monthly | daily
     }
     return config
 
@@ -117,12 +127,23 @@ def main():
         file_size = os.path.getsize(final_file)
         logger.info(f"Backup completed: {final_file} ({file_size / 1024:.1f} KB)")
         
-        # Cleanup old backups
-        cleanup_old_backups(config['backup_dir'], config['retention_days'])
+        # Upload to remote if enabled
+        target = config['backup_target']
+        if target in ['remote', 'all']:
+            upload_to_remote(final_file, config)
         
-        # Verify backup if enabled
+        # Cleanup old backups (only if keeping local)
+        if target in ['local', 'all']:
+            cleanup_old_backups(config['backup_dir'], config['retention_days'])
+        
+        # Verify backup if enabled (before deleting local file)
         if config['verify_enabled']:
             verify_backup(final_file, config)
+        
+        # Delete local file if remote-only mode
+        if target == 'remote':
+            os.remove(final_file)
+            logger.info(f"Removed local file (remote-only mode): {final_file}")
         
     except Exception as e:
         logger.error(f"Backup failed: {e}")
@@ -362,6 +383,42 @@ def drop_temp_db(config):
         conn.close()
     except Exception as e:
         logger.warning(f"Failed to drop temp database: {e}")
+
+
+def upload_to_remote(backup_file, config):
+    """Upload backup file to S3-compatible storage."""
+    logger.info(f"Uploading to remote storage: {config['remote_bucket']}")
+    
+    try:
+        s3_client = boto3.client(
+            's3',
+            endpoint_url=config['remote_endpoint'],
+            aws_access_key_id=config['remote_access_key'],
+            aws_secret_access_key=config['remote_secret_key'],
+            region_name=config['remote_region'],
+            config=Config(signature_version='s3v4')
+        )
+        
+        filename = os.path.basename(backup_file)
+        
+        # Generate path based on format
+        path_format = config['remote_path_format']
+        now = datetime.now()
+        
+        if path_format == 'monthly':
+            remote_path = f"{now.strftime('%Y-%m')}/{filename}"
+        elif path_format == 'daily':
+            remote_path = f"{now.strftime('%Y-%m-%d')}/{filename}"
+        else:  # flat
+            remote_path = filename
+        
+        s3_client.upload_file(backup_file, config['remote_bucket'], remote_path)
+        
+        logger.info(f"Uploaded to remote: {remote_path}")
+        
+    except Exception as e:
+        logger.error(f"Remote upload failed: {e}")
+        raise
 
 
 if __name__ == '__main__':
