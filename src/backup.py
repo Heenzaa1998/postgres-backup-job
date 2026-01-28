@@ -249,6 +249,9 @@ def verify_backup(backup_file, config):
     except Exception as e:
         logger.error(f"Backup verification failed: {e}")
         raise
+    finally:
+        # Always drop temp database
+        drop_temp_db(verify_config)
 
 
 def create_temp_db(config):
@@ -331,6 +334,34 @@ def verify_data(config):
     
     if table_count == 0:
         raise Exception("No tables found in restored database")
+
+
+def drop_temp_db(config):
+    """Drop temporary database."""
+    logger.info(f"Dropping temp database: {config['database']}")
+    
+    try:
+        conn = psycopg2.connect(
+            host=config['host'],
+            port=config['port'],
+            user=config['user'],
+            password=config['password'],
+            dbname='postgres'
+        )
+        conn.autocommit = True
+        
+        cursor = conn.cursor()
+        # Terminate connections to the database
+        cursor.execute(f"""
+            SELECT pg_terminate_backend(pid) 
+            FROM pg_stat_activity 
+            WHERE datname = '{config['database']}'
+        """)
+        cursor.execute(f"DROP DATABASE IF EXISTS {config['database']}")
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        logger.warning(f"Failed to drop temp database: {e}")
 
 
 if __name__ == '__main__':
