@@ -8,7 +8,6 @@ import os
 import sys
 import gzip
 import shutil
-import hashlib
 import subprocess
 from datetime import datetime
 
@@ -18,6 +17,7 @@ from config import get_config
 from logger import logger
 from database import connect_with_retry, verify_backup
 from storage import ensure_backup_dir, cleanup_old_backups, upload_to_remote
+from checksum import generate_checksum
 
 # Load environment variables from .env file
 load_dotenv()
@@ -131,30 +131,6 @@ def compress_backup(backup_file):
         return compressed_file
     except OSError as e:
         logger.error(f"Failed to compress backup: {e}")
-        raise
-
-
-def generate_checksum(file_path):
-    """Generate SHA256 checksum for a file and save to .sha256 file."""
-    sha256_hash = hashlib.sha256()
-    
-    try:
-        with open(file_path, 'rb') as f:
-            for chunk in iter(lambda: f.read(8192), b''):
-                sha256_hash.update(chunk)
-        
-        checksum = sha256_hash.hexdigest()
-        checksum_file = file_path + '.sha256'
-        filename = os.path.basename(file_path)
-        
-        # Write checksum in standard format: "hash  filename"
-        with open(checksum_file, 'w') as f:
-            f.write(f"{checksum}  {filename}\n")
-        
-        logger.info(f"Checksum generated: {checksum[:16]}...")
-        return checksum_file
-    except OSError as e:
-        logger.error(f"Failed to generate checksum: {e}")
         raise
 
 
