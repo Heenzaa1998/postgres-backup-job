@@ -41,6 +41,30 @@ postgres-backup-job/
 | `storage.py` | Local/remote storage, backup directory, cleanup |
 | `checksum.py` | Generate SHA256 checksum files |
 
+## Backup Flow
+
+```mermaid
+flowchart TD
+    A[(PostgreSQL)] --> B[Connect with retry]
+    B --> C[pg_dump]
+    C --> D[gzip compress]
+    D --> E[SHA256 checksum]
+    E --> F{Backup Target?}
+    F -->|remote| G[Upload to remote storage]
+    F -->|local| H[Cleanup old backups]
+    F -->|all| G
+    F -->|all| H
+    G --> I{Verify enabled?}
+    H --> I
+    I -->|yes| J[Restore to temp DB]
+    J --> K[Validate tables]
+    I -->|no| L{Target = remote?}
+    K --> L
+    L -->|yes| M[Delete local files]
+    L -->|no| N[Done]
+    M --> N
+```
+
 ## Quick Start
 
 ```bash
