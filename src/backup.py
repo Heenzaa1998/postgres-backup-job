@@ -9,7 +9,6 @@ import sys
 import gzip
 import time
 import shutil
-import logging
 import hashlib
 import subprocess
 from datetime import datetime, timedelta
@@ -20,17 +19,10 @@ import boto3
 from botocore.client import Config
 
 from config import get_config
+from logger import logger
 
 # Load environment variables from .env file
 load_dotenv()
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
-)
-logger = logging.getLogger(__name__)
 
 
 def test_connection(config):
