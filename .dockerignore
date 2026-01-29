@@ -1,0 +1,45 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv
+.venv
+*.egg-info
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+
+# Backups (don't include in image)
+backups/
+*.sql
+*.sql.gz
+
+# Documentation
+*.md
+!README.md
+
+# Docker
+docker-compose.yml
+docker-compose*.yml
+
+# Tests
+tests/
+*_test.py
+test_*.py
+
+# Misc
+.DS_Store
+Thumbs.db

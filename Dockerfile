@@ -15,9 +15,9 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install PostgreSQL client (for pg_dump)
+# Install PostgreSQL client and gzip (for pg_dump and decompress)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends postgresql-client && \
+    apt-get install -y --no-install-recommends postgresql-client gzip && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
