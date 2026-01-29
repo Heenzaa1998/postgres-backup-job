@@ -13,6 +13,58 @@ Python automation for PostgreSQL backups with gzip compression.
 - **Connection retry** — Automatic retry on connection failure
 - **Configurable** — All settings via environment variables
 
+## Project Structure
+
+```
+postgres-backup-job/
+├── src/
+│   ├── backup.py      # Main entry point + backup orchestration
+│   ├── config.py      # Configuration from environment variables
+│   ├── logger.py      # Logging setup
+│   ├── database.py    # PostgreSQL connection, verify, restore
+│   ├── storage.py     # Local/remote storage, cleanup
+│   └── checksum.py    # SHA256 checksum generation
+├── backups/           # Local backup storage (gitignored)
+├── init-scripts/      # Sample data for development
+├── Dockerfile         # Multi-stage production image
+├── docker-compose.yml # Development environment
+├── requirements.txt   # Python dependencies
+└── .env.example       # Environment template
+```
+
+| Module | Responsibility |
+|--------|---------------|
+| `backup.py` | Main flow: dump → compress → checksum → upload → verify |
+| `config.py` | Read all settings from environment variables |
+| `logger.py` | Consistent log format with timestamps |
+| `database.py` | Connect with retry, create/drop temp DB, restore & verify |
+| `storage.py` | Local/remote storage, backup directory, cleanup |
+| `checksum.py` | Generate SHA256 checksum files |
+
+## Backup Flow
+
+```mermaid
+flowchart TD
+    A[(PostgreSQL)] --> B[Connect with retry]
+    B --> C[pg_dump]
+    C --> D[gzip compress]
+    D --> E[SHA256 checksum]
+    E --> F{Backup Target?}
+    F -->|remote| G[Upload to remote storage]
+    F -->|local| H[Cleanup old backups]
+    F -->|all| G
+    F -->|all| H
+    G --> I{Verify enabled?}
+    H --> I
+    I -->|yes| J[Restore to temp DB]
+    J --> K[Validate tables]
+    I -->|no| L{Target = remote?}
+    K --> L
+    L -->|yes| M[Delete local files]
+    L -->|no| N[Done]
+    M --> N
+```
+
 ## Quick Start
 
 ```bash
