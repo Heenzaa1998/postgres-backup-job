@@ -154,3 +154,32 @@ docker compose exec postgres psql -U backup_user -d testdb -c "SELECT * FROM use
 # Login: minioadmin / minioadmin
 ```
 
+## Docker Usage
+
+### Build
+
+```bash
+docker build -t postgres-backup-job .
+```
+
+### Push
+
+```bash
+docker tag postgres-backup-job <your-registry>/postgres-backup-job:v1.0.0
+docker push <your-registry>/postgres-backup-job:v1.0.0
+```
+
+### Pull
+
+```bash
+docker pull <your-registry>/postgres-backup-job:v1.0.0
+```
+
+### Run
+
+```bash
+docker run --rm --network host \
+  --env-file .env \
+  <your-registry>/postgres-backup-job:v1.0.0
+```
+
