@@ -10,6 +10,7 @@ import gzip
 import time
 import shutil
 import logging
+import hashlib
 import subprocess
 from datetime import datetime, timedelta
 
@@ -123,6 +124,9 @@ def main():
         # Compress backup
         final_file = compress_backup(backup_file)
         
+        # Generate SHA256 checksum
+        checksum_file = generate_checksum(final_file)
+        
         # Show final file info
         file_size = os.path.getsize(final_file)
         logger.info(f"Backup completed: {final_file} ({file_size / 1024:.1f} KB)")
@@ -131,6 +135,7 @@ def main():
         target = config['backup_target']
         if target in ['remote', 'all']:
             upload_to_remote(final_file, config)
+            upload_to_remote(checksum_file, config)
         
         # Cleanup old backups (only if keeping local)
         if target in ['local', 'all']:
@@ -140,10 +145,11 @@ def main():
         if config['verify_enabled']:
             verify_backup(final_file, config)
         
-        # Delete local file if remote-only mode
+        # Delete local files if remote-only mode
         if target == 'remote':
             os.remove(final_file)
-            logger.info(f"Removed local file (remote-only mode): {final_file}")
+            os.remove(checksum_file)
+            logger.info(f"Removed local files (remote-only mode)")
         
     except Exception as e:
         logger.error(f"Backup failed: {e}")
@@ -207,6 +213,30 @@ def compress_backup(backup_file):
         return compressed_file
     except OSError as e:
         logger.error(f"Failed to compress backup: {e}")
+        raise
+
+
+def generate_checksum(file_path):
+    """Generate SHA256 checksum for a file and save to .sha256 file."""
+    sha256_hash = hashlib.sha256()
+    
+    try:
+        with open(file_path, 'rb') as f:
+            for chunk in iter(lambda: f.read(8192), b''):
+                sha256_hash.update(chunk)
+        
+        checksum = sha256_hash.hexdigest()
+        checksum_file = file_path + '.sha256'
+        filename = os.path.basename(file_path)
+        
+        # Write checksum in standard format: "hash  filename"
+        with open(checksum_file, 'w') as f:
+            f.write(f"{checksum}  {filename}\n")
+        
+        logger.info(f"Checksum generated: {checksum[:16]}...")
+        return checksum_file
+    except OSError as e:
+        logger.error(f"Failed to generate checksum: {e}")
         raise
 
 
