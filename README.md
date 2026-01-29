@@ -6,6 +6,7 @@ Python automation for PostgreSQL backups with gzip compression.
 
 - **pg_dump backup** — Full database dump
 - **gzip compression** — Reduce backup size by 70-90%
+- **SHA256 checksum** — Backup integrity verification
 - **Storage strategy** — Local, remote (S3-compatible), or both
 - **Retention policy** — Auto-delete backups older than N days
 - **Backup verification** — Test restore to validate backup integrity
@@ -181,5 +182,15 @@ docker pull <your-registry>/postgres-backup-job:v1.0.0
 docker run --rm --network host \
   --env-file .env \
   <your-registry>/postgres-backup-job:v1.0.0
+```
+
+## Verify Backup Integrity
+
+Every backup generates a `.sha256` checksum file:
+
+```bash
+# Verify checksum
+sha256sum -c backup_2026-01-29_22-14-45.sql.gz.sha256
+# Output: backup_2026-01-29_22-14-45.sql.gz: OK
 ```
 
