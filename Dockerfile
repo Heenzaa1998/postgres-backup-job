@@ -21,18 +21,25 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Create non-root user
+RUN useradd -m -s /bin/bash appuser
+
+# Create backup directory with proper ownership
+RUN mkdir -p /app/backups && chown appuser:appuser /app/backups
+
 # Copy Python packages from builder
-COPY --from=builder /root/.local /root/.local
-ENV PATH=/root/.local/bin:$PATH
+COPY --from=builder /root/.local /home/appuser/.local
+RUN chown -R appuser:appuser /home/appuser/.local
+ENV PATH=/home/appuser/.local/bin:$PATH
 
 # Copy application code
-COPY src/ ./src/
+COPY --chown=appuser:appuser src/ ./src/
 
-# Create backup directory
-RUN mkdir -p /backups
+# Switch to non-root user
+USER appuser
 
 # Set default environment variables
-ENV BACKUP_DIR=/backups
+ENV BACKUP_DIR=/app/backups
 ENV PYTHONUNBUFFERED=1
 
 # Run backup script
