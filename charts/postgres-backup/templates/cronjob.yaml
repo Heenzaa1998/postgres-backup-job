@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "postgres-backup.fullname" . }}
+  labels:
+    {{- include "postgres-backup.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ .Values.successfulJobsHistoryLimit | default 3 }}
+  failedJobsHistoryLimit: {{ .Values.failedJobsHistoryLimit | default 1 }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "postgres-backup.labels" . | nindent 12 }}
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: backup
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              envFrom:
+                - secretRef:
+                    {{- if .Values.secret.existingSecretName }}
+                    name: {{ .Values.secret.existingSecretName }}
+                    {{- else }}
+                    name: {{ include "postgres-backup.fullname" . }}
+                    {{- end }}
+              env:
+                - name: BACKUP_DIR
+                  value: {{ .Values.backup.dir | quote }}
+                - name: BACKUP_TARGET
+                  value: {{ .Values.backup.target | quote }}
+                - name: RETENTION_DAYS
+                  value: {{ .Values.backup.retentionDays | quote }}
+                - name: VERIFY_ENABLED
+                  value: {{ .Values.backup.verifyEnabled | quote }}
+                - name: REMOTE_PATH_FORMAT
+                  value: {{ .Values.remote.pathFormat | quote }}
+              {{- with .Values.resources }}
+              resources:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
