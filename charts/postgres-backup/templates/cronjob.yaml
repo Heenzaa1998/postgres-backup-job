@@ -50,6 +50,10 @@ spec:
                   value: {{ .Values.backup.verifyEnabled | quote }}
                 - name: REMOTE_PATH_FORMAT
                   value: {{ .Values.remote.pathFormat | quote }}
+                - name: DISCORD_NOTIFY_SUCCESS
+                  value: {{ .Values.discord.notifySuccess | quote }}
+                - name: DISCORD_NOTIFY_FAILURE
+                  value: {{ .Values.discord.notifyFailure | quote }}
               {{- with .Values.resources }}
               resources:
                 {{- toYaml . | nindent 16 }}

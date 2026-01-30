@@ -34,6 +34,11 @@ backup:
 remote:
   pathFormat: "monthly"  # flat | monthly | daily
 
+# Discord notification
+discord:
+  notifySuccess: "true"
+  notifyFailure: "true"
+
 # Persistence (PVC for local backup storage)
 persistence:
   size: "1Gi"
