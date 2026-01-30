@@ -11,8 +11,8 @@ failedJobsHistoryLimit: 1
 # Container image
 image:
   repository: ghcr.io/heenzaa1998/postgres-backup-job
-  pullPolicy: Never
-  tag: "1.0.0"  # For production: use "" to default to appVersion
+  pullPolicy: IfNotPresent
+  tag: ""  # Defaults to Chart.appVersion
 
 # Secret configuration
 # For production: create secret externally and reference it here
@@ -21,7 +21,7 @@ secret:
   create: false
   # Name of existing secret containing credentials
   # Create with: kubectl create secret generic <name> --from-env-file=.env
-  existingSecretName: "backup-credentials"
+  existingSecretName: ""  # Required: name of pre-created secret
 
 # Backup configuration (non-sensitive)
 backup:
