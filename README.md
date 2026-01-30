@@ -258,6 +258,97 @@ docker run --rm --network host \
   <your-registry>/postgres-backup-job:v1.0.0
 ```
 
+## Kubernetes Deployment
+
+### Helm Chart
+
+Chart location: `charts/postgres-backup/`
+
+```
+charts/postgres-backup/
+├── Chart.yaml          # Chart metadata
+├── values.yaml         # Default configuration
+└── templates/
+    ├── cronjob.yaml    # CronJob for scheduled backups
+    ├── pvc.yaml        # PersistentVolumeClaim for local storage
+    ├── secret.yaml     # Optional: credentials (demo only)
+    └── NOTES.txt       # Post-install instructions
+```
+
+| Template | Description |
+|----------|-------------|
+| `cronjob.yaml` | Scheduled backup job (default: daily 2am) |
+| `pvc.yaml` | Local backup storage (auto-created) |
+| `secret.yaml` | Demo credentials (see table below) |
+
+### Configuration
+
+Key values in `values.yaml`:
+
+| Value | Default | Description |
+|-------|---------|-------------|
+| `schedule` | `0 2 * * *` | Cron schedule |
+| `persistence.size` | `1Gi` | PVC size |
+| `resources.limits.memory` | `256Mi` | Memory limit |
+| `resources.limits.cpu` | `100m` | CPU limit |
+| `backup.target` | `all` | local, remote, or all |
+| `backup.retentionDays` | `7` | Days to keep backups |
+
+**Secret Configuration:**
+
+| Environment | Method |
+|-------------|--------|
+| Production | `make k8s-secret` |
+| Demo/Test | `secret.create: true` |
+
+### Makefile Commands
+
+```bash
+make help
+```
+
+| Command | Description |
+|---------|-------------|
+| `k8s-ns` | Create namespace |
+| `k8s-secret` | Create secret from .env file |
+| `k8s-deploy` | Deploy helm chart |
+| `k8s-test` | Trigger backup job and show logs |
+| `k8s-logs` | View latest backup logs |
+| `k8s-pvc` | List backup files in PVC |
+| `k8s-status` | Show all resources status |
+| `k8s-download` | Download backups from PVC |
+| `k8s-clean` | Delete all resources |
+
+Override variables:
+
+```bash
+make k8s-deploy NAMESPACE=production RELEASE=prod IMAGE_TAG=2.0.0
+```
+
+### Prerequisites
+
+- Kubernetes cluster (Docker Desktop, minikube, etc.)
+- Helm 3.x
+- kubectl configured
+
+### Quick Deploy
+
+```bash
+# 1. Configure credentials
+cp .env.example .env
+# Edit .env with your database credentials
+
+# 2. Deploy
+make k8s-deploy
+
+# 3. Test backup
+make k8s-test
+
+# 4. View backup files
+make k8s-pvc
+```
+
+
 ## Verify Backup Integrity
 
 Every backup generates a `.sha256` checksum file:
