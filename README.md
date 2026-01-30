@@ -207,6 +207,28 @@ docker compose exec postgres psql -U backup_user -d testdb -c "SELECT * FROM use
 # Login: minioadmin / minioadmin
 ```
 
+## Testing
+
+Run unit tests with pytest:
+
+```bash
+# Install test dependencies
+pip install pytest pytest-mock
+
+# Run all tests
+pytest tests/ -v
+```
+
+### Test Coverage
+
+| Module | Tests | Description |
+|--------|-------|-------------|
+| `config.py` | 3 | Environment variable loading, defaults, verify fallback |
+| `checksum.py` | 4 | SHA256 generation, format, reproducibility, error handling |
+| `storage.py` | 8 | Directory creation, cleanup, S3 upload |
+| `database.py` | 5 | Connection success/failure, retry logic |
+| **Total** | **20** | |
+
 ## Docker Usage
 
 ### Build
