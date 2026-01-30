@@ -26,13 +26,19 @@ secret:
 # Backup configuration (non-sensitive)
 backup:
   dir: "/app/backups"
-  target: "local"  # local | remote | all
+  target: "all"  # local | remote | all
   retentionDays: "7"
   verifyEnabled: "false"
 
 # Remote storage path format (non-sensitive)
 remote:
   pathFormat: "monthly"  # flat | monthly | daily
+
+# Persistence (PVC for local backup storage)
+persistence:
+  size: "1Gi"
+  accessMode: "ReadWriteOnce"
+  storageClass: ""  # Use default storage class
 
 # Resource limits
 resources: {}

@@ -17,10 +17,21 @@ spec:
             {{- include "postgres-backup.labels" . | nindent 12 }}
         spec:
           restartPolicy: Never
+          {{- if ne .Values.backup.target "remote" }}
+          volumes:
+            - name: backup-storage
+              persistentVolumeClaim:
+                claimName: {{ include "postgres-backup.fullname" . }}
+          {{- end }}
           containers:
             - name: backup
               image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
               imagePullPolicy: {{ .Values.image.pullPolicy }}
+              {{- if ne .Values.backup.target "remote" }}
+              volumeMounts:
+                - name: backup-storage
+                  mountPath: {{ .Values.backup.dir }}
+              {{- end }}
               envFrom:
                 - secretRef:
                     {{- if .Values.secret.existingSecretName }}
