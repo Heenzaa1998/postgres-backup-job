@@ -13,7 +13,7 @@ import psycopg2
 from logger import logger
 
 
-def test_connection(config):
+def check_connection(config):
     """Test connection to PostgreSQL database."""
     try:
         conn = psycopg2.connect(
@@ -37,7 +37,7 @@ def connect_with_retry(config):
     retry_delay = config['retry_delay']
     
     for attempt in range(1, retry_count + 1):
-        if test_connection(config):
+        if check_connection(config):
             return True
         
         if attempt < retry_count:
