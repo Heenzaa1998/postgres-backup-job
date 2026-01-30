@@ -2,7 +2,8 @@
 # This is a YAML-formatted file.
 
 # CronJob schedule (cron format)
-schedule: "0 2 * * *"  # Daily at 2:00 AM
+schedule: "5 2 * * *"  # Daily at 2:05 AM
+timeZone: "Asia/Bangkok"  # Timezone for schedule (requires K8s 1.27+)
 
 # Job history limits
 successfulJobsHistoryLimit: 3

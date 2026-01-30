@@ -6,6 +6,7 @@ metadata:
     {{- include "postgres-backup.labels" . | nindent 4 }}
 spec:
   schedule: {{ .Values.schedule | quote }}
+  timeZone: {{ .Values.timeZone | default "UTC" | quote }}
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: {{ .Values.successfulJobsHistoryLimit | default 3 }}
   failedJobsHistoryLimit: {{ .Values.failedJobsHistoryLimit | default 1 }}
