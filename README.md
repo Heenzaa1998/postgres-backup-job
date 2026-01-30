@@ -24,10 +24,13 @@ postgres-backup-job/
 │   ├── database.py    # PostgreSQL connection, verify, restore
 │   ├── storage.py     # Local/remote storage, cleanup
 │   └── checksum.py    # SHA256 checksum generation
+├── charts/            # Helm chart (see K8s Deployment section)
+├── tests/             # Unit tests (pytest)
 ├── backups/           # Local backup storage (gitignored)
 ├── init-scripts/      # Sample data for development
 ├── Dockerfile         # Multi-stage production image
 ├── docker-compose.yml # Development environment
+├── Makefile           # K8s deployment commands
 ├── requirements.txt   # Python dependencies
 └── .env.example       # Environment template
 ```
@@ -269,6 +272,7 @@ charts/postgres-backup/
 ├── Chart.yaml          # Chart metadata
 ├── values.yaml         # Default configuration
 └── templates/
+    ├── _helpers.tpl    # Template helper functions
     ├── cronjob.yaml    # CronJob for scheduled backups
     ├── pvc.yaml        # PersistentVolumeClaim for local storage
     ├── secret.yaml     # Optional: credentials (demo only)
@@ -277,6 +281,7 @@ charts/postgres-backup/
 
 | Template | Description |
 |----------|-------------|
+| `_helpers.tpl` | Template helper functions (naming, labels) |
 | `cronjob.yaml` | Scheduled backup job (default: daily 2am) |
 | `pvc.yaml` | Local backup storage (auto-created) |
 | `secret.yaml` | Demo credentials (see table below) |
