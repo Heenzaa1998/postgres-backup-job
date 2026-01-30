@@ -3,7 +3,7 @@
 import json
 import urllib.request
 import urllib.error
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from logger import logger
 
@@ -91,7 +91,7 @@ def _create_success_embed(
         "description": desc,
         "color": 5763719,  # Green
         "footer": {"text": "PostgreSQL Backup Job"},
-        "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
 
@@ -111,6 +111,6 @@ def _create_failure_embed(
         "description": desc,
         "color": 15548997,  # Red
         "footer": {"text": "PostgreSQL Backup Job"},
-        "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
