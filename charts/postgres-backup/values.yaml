@@ -1,0 +1,54 @@
+# Default values for postgres-backup.
+# This is a YAML-formatted file.
+
+# CronJob schedule (cron format)
+schedule: "0 2 * * *"  # Daily at 2:00 AM
+
+# Job history limits
+successfulJobsHistoryLimit: 3
+failedJobsHistoryLimit: 1
+
+# Container image
+image:
+  repository: ghcr.io/heenzaa1998/postgres-backup-job
+  pullPolicy: IfNotPresent
+  tag: ""  # Defaults to Chart.appVersion
+
+# Secret configuration
+# For production: create secret externally and reference it here
+secret:
+  # Set to true to create secret from values (NOT recommended for production)
+  create: false
+  # Name of existing secret containing credentials
+  # Create with: kubectl create secret generic <name> --from-env-file=.env
+  existingSecretName: ""  # Required: name of pre-created secret
+
+# Backup configuration (non-sensitive)
+backup:
+  dir: "/app/backups"
+  target: "all"  # local | remote | all
+  retentionDays: "7"
+  verifyEnabled: "false"
+
+# Remote storage path format (non-sensitive)
+remote:
+  pathFormat: "monthly"  # flat | monthly | daily
+
+# Persistence (PVC for local backup storage)
+persistence:
+  size: "1Gi"
+  accessMode: "ReadWriteOnce"
+  storageClass: ""  # Use default storage class
+
+# Resource limits
+resources:
+  limits:
+    cpu: 100m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 128Mi
+
+# Override names
+nameOverride: ""
+fullnameOverride: ""

@@ -1,0 +1,17 @@
+apiVersion: v2
+name: postgres-backup
+description: PostgreSQL backup CronJob
+type: application
+
+# Chart version - increment when chart changes
+version: 0.1.0
+
+# App version - matches container image tag
+appVersion: "1.0.0"
+
+keywords:
+  - postgres
+  - backup
+  - cronjob
+
+

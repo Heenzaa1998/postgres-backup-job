@@ -1,0 +1,16 @@
+PostgreSQL Backup CronJob has been installed!
+
+Schedule: {{ .Values.schedule }}
+Image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+
+To check the CronJob status:
+  kubectl get cronjobs {{ include "postgres-backup.fullname" . }}
+
+To manually trigger a backup job:
+  kubectl create job --from=cronjob/{{ include "postgres-backup.fullname" . }} manual-backup-$(date +%s)
+
+To view backup logs:
+  kubectl logs -l app.kubernetes.io/name={{ include "postgres-backup.name" . }} --tail=100
+
+To list completed jobs:
+  kubectl get jobs -l app.kubernetes.io/name={{ include "postgres-backup.name" . }}
