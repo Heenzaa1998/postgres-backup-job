@@ -11,6 +11,7 @@ Python automation for PostgreSQL backups with gzip compression.
 - **Retention policy** — Auto-delete backups older than N days
 - **Backup verification** — Test restore to validate backup integrity
 - **Connection retry** — Automatic retry on connection failure
+- **Discord notification** — Get alerts on backup success/failure
 - **Configurable** — All settings via environment variables
 
 ## Project Structure
@@ -23,7 +24,8 @@ postgres-backup-job/
 │   ├── logger.py      # Logging setup
 │   ├── database.py    # PostgreSQL connection, verify, restore
 │   ├── storage.py     # Local/remote storage, cleanup
-│   └── checksum.py    # SHA256 checksum generation
+│   ├── checksum.py    # SHA256 checksum generation
+│   └── notification.py # Discord webhook notifications
 ├── charts/            # Helm chart (see K8s Deployment section)
 ├── tests/             # Unit tests (pytest)
 ├── backups/           # Local backup storage (gitignored)
@@ -43,6 +45,7 @@ postgres-backup-job/
 | `database.py` | Connect with retry, create/drop temp DB, restore & verify |
 | `storage.py` | Local/remote storage, backup directory, cleanup |
 | `checksum.py` | Generate SHA256 checksum files |
+| `notification.py` | Discord webhook notifications |
 
 ## Backup Flow
 
@@ -64,8 +67,9 @@ flowchart TD
     I -->|no| L{Target = remote?}
     K --> L
     L -->|yes| M[Delete local files]
-    L -->|no| N[Done]
+    L -->|no| N[Discord notification]
     M --> N
+    N --> O[Done]
 ```
 
 ## Quick Start
@@ -110,6 +114,9 @@ python src/backup.py
 | `REMOTE_SECRET_KEY` | minioadmin | Secret key |
 | `REMOTE_REGION` | us-east-1 | Region |
 | `REMOTE_PATH_FORMAT` | monthly | Path format: flat, monthly, or daily |
+| `DISCORD_WEBHOOK_URL` | | Discord webhook URL for notifications |
+| `DISCORD_NOTIFY_SUCCESS` | true | Send notification on successful backup |
+| `DISCORD_NOTIFY_FAILURE` | true | Send notification on failed backup |
 
 > **Production Recommendation:** For production environments, use a **separate PostgreSQL instance** for verification to avoid impacting production performance and to validate backup portability.
 
@@ -230,7 +237,8 @@ pytest tests/ -v
 | `checksum.py` | 4 | SHA256 generation, format, reproducibility, error handling |
 | `storage.py` | 8 | Directory creation, cleanup, S3 upload |
 | `database.py` | 5 | Connection success/failure, retry logic |
-| **Total** | **20** | |
+| `notification.py` | 5 | Discord embed format, webhook sending, error handling |
+| **Total** | **25** | |
 
 ## Docker Usage
 
@@ -292,12 +300,15 @@ Key values in `values.yaml`:
 
 | Value | Default | Description |
 |-------|---------|-------------|
-| `schedule` | `0 2 * * *` | Cron schedule |
+| `schedule` | `5 2 * * *` | Cron schedule |
+| `timeZone` | `Asia/Bangkok` | Schedule timezone (requires K8s 1.27+) |
 | `persistence.size` | `1Gi` | PVC size |
 | `resources.limits.memory` | `256Mi` | Memory limit |
 | `resources.limits.cpu` | `100m` | CPU limit |
 | `backup.target` | `all` | local, remote, or all |
 | `backup.retentionDays` | `7` | Days to keep backups |
+| `discord.notifySuccess` | `true` | Send Discord notification on success |
+| `discord.notifyFailure` | `true` | Send Discord notification on failure |
 
 **Secret Configuration:**
 
