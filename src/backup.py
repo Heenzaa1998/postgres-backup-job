@@ -18,6 +18,7 @@ from logger import logger
 from database import connect_with_retry, verify_backup
 from storage import ensure_backup_dir, cleanup_old_backups, upload_to_remote
 from checksum import generate_checksum
+from notification import send_discord_notification
 
 # Load environment variables from .env file
 load_dotenv()
@@ -27,6 +28,11 @@ def main():
     """Main entry point."""
     logger.info("Starting backup script...")
     
+    config = None
+    start_time = datetime.now()
+    final_file = None
+    file_size = None
+    
     try:
         # Load configuration
         config = get_config()
@@ -35,6 +41,7 @@ def main():
         # Test database connection with retry
         if not connect_with_retry(config):
             logger.error("Database connection failed after all retries. Exiting.")
+            _send_failure_notification(config, "Connection failed after all retries", "Database connection")
             sys.exit(1)
         
         logger.info("Database connection successful!")
@@ -78,9 +85,60 @@ def main():
             os.remove(checksum_file)
             logger.info(f"Removed local files (remote-only mode)")
         
+        # Send success notification
+        duration = (datetime.now() - start_time).total_seconds()
+        _send_success_notification(config, final_file, file_size, target, duration)
+        
     except Exception as e:
         logger.error(f"Backup failed: {e}")
+        if config:
+            _send_failure_notification(config, str(e), "Backup process")
         sys.exit(1)
+
+
+def _send_success_notification(config, filename, file_size, storage, duration):
+    """Send Discord notification for successful backup."""
+    if not config.get('discord_notify_success'):
+        return
+    
+    # Format file size
+    if file_size:
+        if file_size < 1024:
+            size_str = f"{file_size} B"
+        elif file_size < 1024 * 1024:
+            size_str = f"{file_size / 1024:.1f} KB"
+        else:
+            size_str = f"{file_size / (1024 * 1024):.1f} MB"
+    else:
+        size_str = "N/A"
+    
+    # Format storage target
+    storage_map = {"local": "Local", "remote": "S3", "all": "S3 + Local"}
+    storage_str = storage_map.get(storage, storage)
+    
+    send_discord_notification(
+        webhook_url=config.get('discord_webhook_url', ''),
+        success=True,
+        database=config['database'],
+        filename=os.path.basename(filename) if filename else None,
+        file_size=size_str,
+        storage=storage_str,
+        duration=duration,
+    )
+
+
+def _send_failure_notification(config, error_message, error_step):
+    """Send Discord notification for failed backup."""
+    if not config.get('discord_notify_failure'):
+        return
+    
+    send_discord_notification(
+        webhook_url=config.get('discord_webhook_url', ''),
+        success=False,
+        database=config.get('database', 'unknown'),
+        error_message=error_message,
+        error_step=error_step,
+    )
 
 
 def generate_backup_filename(backup_dir):

@@ -39,5 +39,10 @@ def get_config():
         'remote_secret_key': os.environ.get('REMOTE_SECRET_KEY', 'minioadmin'),
         'remote_region': os.environ.get('REMOTE_REGION', 'us-east-1'),
         'remote_path_format': os.environ.get('REMOTE_PATH_FORMAT', 'monthly'),  # flat | monthly | daily
+        
+        # Discord notification
+        'discord_webhook_url': os.environ.get('DISCORD_WEBHOOK_URL', ''),
+        'discord_notify_success': os.environ.get('DISCORD_NOTIFY_SUCCESS', 'true').lower() == 'true',
+        'discord_notify_failure': os.environ.get('DISCORD_NOTIFY_FAILURE', 'true').lower() == 'true',
     }
     return config
