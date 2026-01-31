@@ -1,4 +1,11 @@
+
 # postgres-backup-job
+
+![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-Helm-326CE5?logo=kubernetes&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green)
 
 Python automation for PostgreSQL backups with gzip compression.
 
@@ -71,6 +78,60 @@ flowchart TD
     M --> N
     N --> O[Done]
 ```
+
+## Design Decisions
+
+### Why Python?
+- **Rich ecosystem**: Leverage `boto3` for robust S3 interactions and `psycopg2` for reliable PostgreSQL connections.
+- **Better error handling**: Implemented `try/except` blocks with structured logging, avoiding the fragility of Bash scripts and cryptic exit codes.
+- **Testable**: The modular design allows for Unit Testing (via `pytest`) and mocking dependencies, ensuring reliability before deployment.
+
+### Why Kubernetes CronJob?
+- **Native Scheduler**: Utilizes Kubernetes' built-in scheduler, removing dependencies on external tools like systemd or crond.
+- **Ephemeral Efficiency**: Pods run only during the backup window and terminate immediately after, saving cluster resources.
+- **Clean Failure Handling**: Uses `restartPolicy: Never` to ensure failed jobs don't restart indefinitely.
+
+### Why Modular Architecture?
+- **Separation of Concerns**: Database operations, storage logic, and notifications are isolated in their own modules (`src/database`, `src/storage`, `src/notification`).
+- **Maintainability**: Allows swapping backend storage (e.g., S3 to GCS) or notification providers without refactoring the core logic.
+- **Testability**: Enable isolated unit testing for each component.
+
+---
+
+## Trade-offs Analysis
+
+| Decision | Choice | Trade-off / Rationale |
+|----------|--------|-----------|
+| **Compression** | `gzip` over `zstd` | `zstd` is faster, but `gzip` is ubiquitous. This ensures backups can be restored on any standard Linux/Unix system without installing additional tools. |
+| **Backup Strategy** | `pg_dump` over `pg_basebackup` | `pg_basebackup` offers faster physical backups with PITR, but `pg_dump` provides logical backups which are version-agnostic and allow for selective table restoration. |
+| **Secret Management** | Pre-created K8s Secret | Requires extra step (`kubectl create secret`), but keeps credentials out of Git and Helm values. |
+| **Notification** | Discord Webhook | Chosen for simplicity (HTTP POST) over Email (SMTP), eliminating the need for complex mail server configuration. |
+
+---
+
+## Demo
+
+### Kubernetes Deployment
+| Deploy | Status | Logs |
+|--------|--------|------|
+| ![k8s-deploy](docs/screenshots/k8s-deploy_screenshot.PNG) | ![k8s-status](docs/screenshots/k8s-status_screenshot.PNG) | ![k8s-test](docs/screenshots/k8s-test_screenshot.PNG) |
+
+### Backup Storage
+| PVC (Local) | Remote (S3/MinIO) |
+|-------------|-------------------|
+| ![k8s-pvc](docs/screenshots/k8s-pvc_screenshot.PNG) | ![remote](docs/screenshots/remotestorage_screenshot.PNG) |
+
+### Discord Notifications
+| Success | Failure |
+|---------|---------|
+| ![success](docs/screenshots/discord_success_screenshot.PNG) | ![failed](docs/screenshots/discord_failed_screenshot.PNG) |
+
+### Restore Process
+| Download from PVC | Unzip & Restore | Verify Tables |
+|-------------------|-----------------|---------------|
+| ![download](docs/screenshots/k8s-download_screenshot.PNG) | ![restore](docs/screenshots/unzup-and-restore_screenshot.PNG) | ![verify](docs/screenshots/verify-restore_screenshot.PNG) |
+
+---
 
 ## Quick Start
 
@@ -375,3 +436,72 @@ sha256sum -c backup_2026-01-29_22-14-45.sql.gz.sha256
 # Output: backup_2026-01-29_22-14-45.sql.gz: OK
 ```
 
+## Backup Retrieval & Restoration
+
+### Download Backups
+
+Download backups from PVC to local machine:
+
+```bash
+make k8s-download
+# Files saved to ./backups/
+```
+
+### Restore to Database Guide
+
+1. **Verify checksum (optional):**
+   ```bash
+   cd backups && sha256sum -c backup_YYYY-MM-DD.sql.gz.sha256
+   # Output: backup_YYYY-MM-DD.sql.gz: OK
+   ```
+
+2. **Decompress backup:**
+   ```bash
+   gunzip -c backups/backup_YYYY-MM-DD.sql.gz > dump.sql
+   ```
+
+3. **Create target database:**
+   ```bash
+   PGPASSWORD=<password> psql -h <host> -p <port> -U <user> -d postgres -c "DROP DATABASE IF EXISTS <target_db>;"
+   PGPASSWORD=<password> psql -h <host> -p <port> -U <user> -d postgres -c "CREATE DATABASE <target_db>;"
+   ```
+
+4. **Restore data:**
+   ```bash
+   PGPASSWORD=<password> psql -h <host> -p <port> -U <user> -d <target_db> < dump.sql
+   ```
+
+5. **Verify tables:**
+   ```bash
+   PGPASSWORD=<password> psql -h <host> -p <port> -U <user> -d <target_db> -c "\dt"
+   ```
+
+> **Note:** Replace `<password>`, `<host>`, `<port>`, `<user>`, `<target_db>` with your PostgreSQL credentials. Default port is `5432`.
+
+---
+
+## Challenges & Solutions
+
+| Challenge | Solution |
+|-----------|----------|
+| **Timezone Consistency** | Docker containers default to UTC. We use Kubernetes 1.27+ `timeZone` field in CronJob spec and Python's `datetime` for consistent filenames. |
+| **S3 Signature Errors** | Some MinIO versions reject default boto3 signatures. Solved by forcing `signature_version='s3v4'` in the boto3 client config. |
+
+---
+
+## Demo Environment
+
+- **Cluster**: Docker Desktop Kubernetes (v1.32.2)
+- **OS**: Windows 10 (WSL2 integration)
+- **Database**: PostgreSQL 16
+- **Storage**: MinIO (S3-compatible object storage)
+
+---
+
+## References
+
+- [PostgreSQL pg_dump Documentation](https://www.postgresql.org/docs/current/app-pgdump.html)
+- [AWS SDK for Python (Boto3)](https://boto3.amazonaws.com/v1/documentation/api/latest/index.html)
+- [Kubernetes CronJob Concepts](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/)
+- [Helm Chart Development Guide](https://helm.sh/docs/chart_template_guide/)
+- [Kubernetes TimeZone Support (KEP-3140)](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones)
